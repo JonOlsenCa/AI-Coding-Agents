@@ -149,8 +149,9 @@ To build and run this extension locally:
 ### Custom Prompts Editor
 ![Custom Prompts](https://raw.githubusercontent.com/JonOlsenCa/AI-Coding-Agents/main/screenshots/prompt-editor.png)
 
-### Conversation History View
+### Conversation History View (Coming Soon)
 ![History View](https://raw.githubusercontent.com/JonOlsenCa/AI-Coding-Agents/main/screenshots/history-view.png)
+*Note: The conversation history view is under development and will be available in a future update.*
 
 ## License
 
