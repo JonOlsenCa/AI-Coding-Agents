@@ -8,7 +8,7 @@ const AgentSidebar = require('./agent-sidebar');
 const WelcomePanel = require('./welcome-panel');
 const CustomPrompts = require('./custom-prompts');
 const PromptEditor = require('./prompt-editor');
-const HistoryView = require('./history-view');
+// const HistoryView = require('./history-view'); // Commented out for now
 
 function activate(context) {
   // Register commands for each agent
@@ -41,7 +41,7 @@ function activate(context) {
   const promptEditor = new PromptEditor(context, customPrompts);
 
   // Create history view
-  const historyView = new HistoryView(context);
+  // const historyView = new HistoryView(context); // Commented out for now
 
   // Initialize agent memory
   agentMemory.initialize(context);
@@ -173,7 +173,8 @@ function activate(context) {
   // Register command to show conversation history
   context.subscriptions.push(
     vscode.commands.registerCommand('aiAgents.showHistory', () => {
-      historyView.show();
+      // historyView.show(); // Commented out for now
+      vscode.window.showInformationMessage('Conversation history view is coming soon.');
     })
   );
 
@@ -337,6 +338,7 @@ async function invokeAgent(agentType, agentPanelManager, customPrompts) {
     }
 
     // Get context information for history
+    const activeEditor = vscode.window.activeTextEditor;
     const contextInfo = {
       fileName: activeEditor ? activeEditor.document.fileName : '',
       language: activeEditor ? activeEditor.document.languageId : '',

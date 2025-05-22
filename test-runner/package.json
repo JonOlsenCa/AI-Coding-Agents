@@ -1,0 +1,29 @@
+{
+  "name": "test-runner",
+  "displayName": "Test Runner",
+  "description": "Test runner for AI Coding Agents",
+  "version": "0.0.1",
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [],
+  "main": "./extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "test-runner.runTests",
+        "title": "Run AI Coding Agents Tests"
+      }
+    ]
+  },
+  "scripts": {
+    "test": "node ./test/runTest.js"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.90.0",
+    "@vscode/test-electron": "^2.3.8"
+  }
+}
