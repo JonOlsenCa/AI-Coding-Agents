@@ -283,8 +283,7 @@ async function invokeAgent(agentType, agentPanelManager, customPrompts) {
     // Get conversation history
     const conversationHistory = agentMemory.formatConversationHistoryForPrompt(agentType);
 
-    // Get configuration
-    const config = vscode.workspace.getConfiguration('aiAgents');
+    // Get custom prompts setting
     const useCustomPrompts = config.get('useCustomPrompts', true);
 
     // Get the appropriate prompt (custom or default)
