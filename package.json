@@ -2,8 +2,8 @@
   "name": "ai-coding-agents",
   "displayName": "AI Coding Agents",
   "description": "Specialized AI coding agents for different development roles",
-  "version": "1.0.1",
-  "publisher": "JonOlsen",
+  "version": "1.0.2",
+  "publisher": "jonolsenca",
   "author": {
     "name": "Jon Olsen"
   },
