@@ -1,7 +1,7 @@
 # AI Coding Agents for VS Code
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/JonOlsenCa/Agents/main/media/icon.png" width="128" height="128" alt="AI Coding Agents Icon">
+  <img src="https://raw.githubusercontent.com/JonOlsenCa/AI-Coding-Agents/main/media/icon.png" width="128" height="128" alt="AI Coding Agents Icon">
 </p>
 
 <p align="center">
@@ -11,8 +11,8 @@
   <a href="https://marketplace.visualstudio.com/items?itemName=JonOlsen.ai-coding-agents">
     <img src="https://img.shields.io/visual-studio-marketplace/i/JonOlsen.ai-coding-agents?color=blue" alt="VS Code Marketplace Installs">
   </a>
-  <a href="https://github.com/JonOlsenCa/Agents/blob/main/LICENSE">
-    <img src="https://img.shields.io/github/license/JonOlsenCa/Agents?color=blue" alt="License">
+  <a href="https://github.com/JonOlsenCa/AI-Coding-Agents/blob/main/LICENSE">
+    <img src="https://img.shields.io/github/license/JonOlsenCa/AI-Coding-Agents?color=blue" alt="License">
   </a>
 </p>
 
@@ -138,19 +138,19 @@ To build and run this extension locally:
 ## Screenshots
 
 ### Agent Panel with Chat and Actions
-![Agent Panel](https://raw.githubusercontent.com/JonOlsenCa/Agents/main/screenshots/agent-panel.png)
+![Agent Panel](https://raw.githubusercontent.com/JonOlsenCa/AI-Coding-Agents/main/screenshots/agent-panel.png)
 
 ### Sidebar View
-![Sidebar View](https://raw.githubusercontent.com/JonOlsenCa/Agents/main/screenshots/sidebar-view.png)
+![Sidebar View](https://raw.githubusercontent.com/JonOlsenCa/AI-Coding-Agents/main/screenshots/sidebar-view.png)
 
 ### Welcome Experience
-![Welcome Experience](https://raw.githubusercontent.com/JonOlsenCa/Agents/main/screenshots/welcome-panel.png)
+![Welcome Experience](https://raw.githubusercontent.com/JonOlsenCa/AI-Coding-Agents/main/screenshots/welcome-panel.png)
 
 ### Custom Prompts Editor
-![Custom Prompts](https://raw.githubusercontent.com/JonOlsenCa/Agents/main/screenshots/prompt-editor.png)
+![Custom Prompts](https://raw.githubusercontent.com/JonOlsenCa/AI-Coding-Agents/main/screenshots/prompt-editor.png)
 
 ### Conversation History View
-![History View](https://raw.githubusercontent.com/JonOlsenCa/Agents/main/screenshots/history-view.png)
+![History View](https://raw.githubusercontent.com/JonOlsenCa/AI-Coding-Agents/main/screenshots/history-view.png)
 
 ## License
 
