@@ -1,150 +1,161 @@
 const vscode = require('vscode');
 const path = require('path');
-const agentMemory = require('./agent-memory');
+const fs = require('fs');
 
 /**
- * Manages the history view panel
+ * Class to manage the history view
  */
 class HistoryView {
   /**
    * Create a new history view
-   * @param {vscode.ExtensionContext} context - The extension context
+   * @param {Object} context - The extension context
+   * @param {Object} agentMemory - The agent memory manager
    */
-  constructor(context) {
+  constructor(context, agentMemory) {
     this.context = context;
+    this.agentMemory = agentMemory;
     this.panel = null;
   }
 
   /**
-   * Show the history view panel
+   * Show the history view
    */
   show() {
-    // If panel already exists, reveal it
-    if (this.panel) {
-      this.panel.reveal();
-      this.updateContent();
-      return;
-    }
-
-    // Create a new panel
+    // Create and show panel
     this.panel = vscode.window.createWebviewPanel(
-      'aiAgents.historyView',
-      'AI Agent Conversation History',
+      'historyView',
+      'AI Agents: Conversation History',
       vscode.ViewColumn.One,
       {
         enableScripts: true,
-        retainContextWhenHidden: true,
-        localResourceRoots: [
-          vscode.Uri.file(path.join(this.context.extensionPath, 'media'))
-        ]
+        retainContextWhenHidden: true
       }
     );
 
-    // Set initial HTML content
+    // Set the HTML content
     this.updateContent();
 
     // Handle messages from the webview
     this.panel.webview.onDidReceiveMessage(
-      async message => {
+      message => {
         switch (message.command) {
-          case 'search':
-            this.updateContent(message.query, message.filters);
+          case 'reuseQuestion':
+            this.handleReuseQuestion(message.agentType, message.question);
             break;
           case 'clearHistory':
-            if (message.agentType) {
-              agentMemory.clearConversationHistory(message.agentType);
-              vscode.window.showInformationMessage(`Cleared history for ${formatAgentName(message.agentType)}`);
-            } else {
-              agentMemory.clearAllConversationHistory();
-              vscode.window.showInformationMessage('Cleared all conversation history');
-            }
-            this.updateContent();
+            this.handleClearHistory(message.agentType);
             break;
-          case 'reuse':
-            // Reuse a conversation by opening the agent with the same question
-            if (message.agentType && message.userMessage) {
-              vscode.commands.executeCommand(`aiAgents.${message.agentType}`, message.userMessage);
-            }
+          case 'clearAllHistory':
+            this.handleClearAllHistory();
+            break;
+          case 'search':
+            this.handleSearch(message.query);
+            break;
+          case 'filter':
+            this.handleFilter(message.agentType);
             break;
         }
       },
       undefined,
       this.context.subscriptions
     );
-
-    // Handle panel disposal
-    this.panel.onDidDispose(
-      () => {
-        this.panel = null;
-      },
-      null,
-      this.context.subscriptions
-    );
   }
 
   /**
-   * Update the panel content
-   * @param {string} query - Search query
-   * @param {Object} filters - Filters to apply
+   * Update the content of the history view
    */
-  updateContent(query = '', filters = {}) {
+  updateContent() {
     if (!this.panel) return;
     
-    this.panel.webview.html = this.getWebviewContent(query, filters);
+    this.panel.webview.html = this.getWebviewContent();
   }
 
   /**
-   * Get the HTML content for the webview
-   * @param {string} query - Search query
-   * @param {Object} filters - Filters to apply
+   * Handle reusing a question
+   * @param {string} agentType - The agent type
+   * @param {string} question - The question to reuse
+   */
+  handleReuseQuestion(agentType, question) {
+    // Create a command to invoke the agent with the question
+    vscode.commands.executeCommand(agentType, question);
+  }
+
+  /**
+   * Handle clearing history for an agent
+   * @param {string} agentType - The agent type
+   */
+  handleClearHistory(agentType) {
+    this.agentMemory.clearConversations(agentType);
+    this.updateContent();
+    vscode.window.showInformationMessage(`History cleared for ${formatAgentName(agentType)}`);
+  }
+
+  /**
+   * Handle clearing all history
+   */
+  handleClearAllHistory() {
+    this.agentMemory.clearAllConversations();
+    this.updateContent();
+    vscode.window.showInformationMessage('All conversation history cleared');
+  }
+
+  /**
+   * Handle search
+   * @param {string} query - The search query
+   */
+  handleSearch(query) {
+    this.searchQuery = query;
+    this.updateContent();
+  }
+
+  /**
+   * Handle filter
+   * @param {string} agentType - The agent type to filter by
+   */
+  handleFilter(agentType) {
+    this.filterAgent = agentType === 'all' ? null : agentType;
+    this.updateContent();
+  }
+
+  /**
+   * Get the webview content
    * @returns {string} - The HTML content
    */
-  getWebviewContent(query = '', filters = {}) {
-    // Get conversation history
-    const history = query || Object.keys(filters).length > 0
-      ? agentMemory.searchConversationHistory(query, filters)
-      : agentMemory.getAllConversationHistory();
+  getWebviewContent() {
+    // Get all conversations
+    let conversations = this.agentMemory.getAllConversations();
     
-    // Get available agent types and languages for filters
-    const agentTypes = agentMemory.getAgentTypesWithHistory();
-    const languages = agentMemory.getLanguagesInHistory();
+    // Apply search filter if needed
+    if (this.searchQuery) {
+      const query = this.searchQuery.toLowerCase();
+      conversations = conversations.filter(conv => 
+        conv.userMessage.toLowerCase().includes(query) || 
+        conv.agentResponse.toLowerCase().includes(query)
+      );
+    }
     
-    // Format agent options
-    const agentOptions = agentTypes.map(agent => 
-      `<option value="${agent}" ${filters.agentType === agent ? 'selected' : ''}>${formatAgentName(agent)}</option>`
-    ).join('');
+    // Apply agent filter if needed
+    if (this.filterAgent) {
+      conversations = conversations.filter(conv => conv.agentType === this.filterAgent);
+    }
     
-    // Format language options
-    const languageOptions = languages.map(language => 
-      `<option value="${language}" ${filters.language === language ? 'selected' : ''}>${language}</option>`
-    ).join('');
+    // Sort by timestamp (newest first)
+    conversations.sort((a, b) => b.timestamp - a.timestamp);
     
-    // Format conversation history
-    const historyHtml = history.length > 0
-      ? history.map(entry => this.formatHistoryEntry(entry)).join('')
-      : '<div class="empty-state">No conversation history found</div>';
-
+    // Get all agent types for the filter dropdown
+    const agentTypes = [...new Set(this.agentMemory.getAllConversations().map(conv => conv.agentType))];
+    
     return `<!DOCTYPE html>
     <html lang="en">
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>AI Agent Conversation History</title>
+        <title>AI Agents: Conversation History</title>
         <style>
             body {
                 font-family: var(--vscode-font-family);
-                color: var(--vscode-foreground);
-                background-color: var(--vscode-editor-background);
                 padding: 20px;
-                line-height: 1.5;
-            }
-            h1, h2, h3 {
-                color: var(--vscode-editor-foreground);
-                font-weight: 600;
-            }
-            .history-container {
-                max-width: 1000px;
-                margin: 0 auto;
+                color: var(--vscode-foreground);
             }
             .header {
                 display: flex;
@@ -152,266 +163,170 @@ class HistoryView {
                 align-items: center;
                 margin-bottom: 20px;
             }
-            .search-container {
-                background-color: var(--vscode-editor-inactiveSelectionBackground);
-                padding: 15px;
-                border-radius: 6px;
+            .title {
+                font-size: 1.5em;
+                font-weight: bold;
+            }
+            .controls {
+                display: flex;
+                gap: 10px;
                 margin-bottom: 20px;
             }
-            .search-row {
-                display: flex;
-                gap: 10px;
-                margin-bottom: 10px;
-            }
-            .search-input {
-                flex: 1;
-                padding: 5px 10px;
+            .search-box {
+                flex-grow: 1;
+                padding: 5px;
+                border: 1px solid var(--vscode-input-border);
                 background-color: var(--vscode-input-background);
                 color: var(--vscode-input-foreground);
-                border: 1px solid var(--vscode-input-border);
-                border-radius: 2px;
             }
-            .filter-row {
-                display: flex;
-                gap: 10px;
-            }
-            .filter-group {
-                flex: 1;
-            }
-            .filter-label {
-                display: block;
-                margin-bottom: 5px;
-                font-size: 12px;
-            }
-            .filter-select {
-                width: 100%;
+            .filter-dropdown {
                 padding: 5px;
+                border: 1px solid var(--vscode-dropdown-border);
                 background-color: var(--vscode-dropdown-background);
                 color: var(--vscode-dropdown-foreground);
-                border: 1px solid var(--vscode-dropdown-border);
-                border-radius: 2px;
-            }
-            .filter-date {
-                width: 100%;
-                padding: 5px;
-                background-color: var(--vscode-input-background);
-                color: var(--vscode-input-foreground);
-                border: 1px solid var(--vscode-input-border);
-                border-radius: 2px;
-            }
-            .button-container {
-                display: flex;
-                justify-content: space-between;
-                margin-top: 10px;
             }
             button {
+                padding: 5px 10px;
                 background-color: var(--vscode-button-background);
                 color: var(--vscode-button-foreground);
                 border: none;
-                padding: 6px 12px;
-                border-radius: 2px;
                 cursor: pointer;
-                font-size: 13px;
             }
             button:hover {
                 background-color: var(--vscode-button-hoverBackground);
             }
             .history-entry {
-                background-color: var(--vscode-editor-inactiveSelectionBackground);
-                border-radius: 6px;
-                margin-bottom: 15px;
+                margin-bottom: 20px;
+                border: 1px solid var(--vscode-panel-border);
+                border-radius: 4px;
                 overflow: hidden;
             }
             .history-header {
                 display: flex;
                 justify-content: space-between;
-                align-items: center;
-                padding: 10px 15px;
-                background-color: var(--vscode-editor-selectionBackground);
-                font-size: 13px;
+                padding: 10px;
+                background-color: var(--vscode-editor-inactiveSelectionBackground);
             }
             .agent-name {
                 font-weight: bold;
             }
             .timestamp {
+                font-size: 0.9em;
                 color: var(--vscode-descriptionForeground);
-                font-size: 12px;
             }
             .history-content {
-                padding: 15px;
+                padding: 10px;
             }
             .message {
-                margin-bottom: 15px;
+                margin-bottom: 10px;
             }
             .message-label {
                 font-weight: bold;
                 margin-bottom: 5px;
             }
             .user-message {
-                background-color: var(--vscode-editor-background);
-                padding: 10px;
-                border-radius: 4px;
+                white-space: pre-wrap;
                 margin-bottom: 10px;
             }
             .agent-message {
-                background-color: var(--vscode-editor-background);
-                padding: 10px;
-                border-radius: 4px;
                 white-space: pre-wrap;
             }
             .context-info {
-                margin-top: 10px;
-                font-size: 12px;
+                font-size: 0.9em;
                 color: var(--vscode-descriptionForeground);
+                margin-top: 10px;
+                padding-top: 10px;
+                border-top: 1px solid var(--vscode-panel-border);
             }
             .history-actions {
                 display: flex;
-                justify-content: flex-end;
                 gap: 10px;
-                padding: 0 15px 15px;
+                padding: 10px;
+                background-color: var(--vscode-editor-inactiveSelectionBackground);
             }
-            .empty-state {
+            .no-history {
                 text-align: center;
-                padding: 40px;
+                padding: 20px;
                 color: var(--vscode-descriptionForeground);
-                font-style: italic;
-            }
-            .danger-button {
-                background-color: var(--vscode-errorForeground);
-            }
-            .danger-button:hover {
-                opacity: 0.9;
             }
         </style>
     </head>
     <body>
-        <div class="history-container">
-            <div class="header">
-                <h1>AI Agent Conversation History</h1>
-            </div>
-
-            <div class="search-container">
-                <div class="search-row">
-                    <input type="text" id="searchInput" class="search-input" placeholder="Search conversations..." value="${escapeHtml(query)}">
-                    <button id="searchButton">Search</button>
-                </div>
-                <div class="filter-row">
-                    <div class="filter-group">
-                        <label class="filter-label">Agent Type</label>
-                        <select id="agentFilter" class="filter-select">
-                            <option value="">All Agents</option>
-                            ${agentOptions}
-                        </select>
-                    </div>
-                    <div class="filter-group">
-                        <label class="filter-label">Language</label>
-                        <select id="languageFilter" class="filter-select">
-                            <option value="">All Languages</option>
-                            ${languageOptions}
-                        </select>
-                    </div>
-                    <div class="filter-group">
-                        <label class="filter-label">From Date</label>
-                        <input type="date" id="dateFromFilter" class="filter-date" value="${filters.dateFrom || ''}">
-                    </div>
-                    <div class="filter-group">
-                        <label class="filter-label">To Date</label>
-                        <input type="date" id="dateToFilter" class="filter-date" value="${filters.dateTo || ''}">
-                    </div>
-                </div>
-                <div class="button-container">
-                    <div>
-                        <button id="clearFiltersButton">Clear Filters</button>
-                    </div>
-                    <div>
-                        <button id="clearHistoryButton" class="danger-button">Clear All History</button>
-                    </div>
-                </div>
-            </div>
-
-            <div class="history-list">
-                ${historyHtml}
-            </div>
+        <div class="header">
+            <div class="title">Conversation History</div>
+            <button id="clear-all-button">Clear All History</button>
         </div>
-
+        
+        <div class="controls">
+            <input type="text" class="search-box" id="search-box" placeholder="Search conversations...">
+            <select class="filter-dropdown" id="filter-dropdown">
+                <option value="all">All Agents</option>
+                ${agentTypes.map(type => `<option value="${type}" ${this.filterAgent === type ? 'selected' : ''}>${formatAgentName(type)}</option>`).join('')}
+            </select>
+            <button id="search-button">Search</button>
+        </div>
+        
+        <div class="history-container">
+            ${conversations.length > 0 ? 
+                conversations.map(entry => this.formatHistoryEntry(entry)).join('') : 
+                '<div class="no-history">No conversation history found</div>'}
+        </div>
+        
         <script>
             (function() {
                 const vscode = acquireVsCodeApi();
-                const searchInput = document.getElementById('searchInput');
-                const searchButton = document.getElementById('searchButton');
-                const agentFilter = document.getElementById('agentFilter');
-                const languageFilter = document.getElementById('languageFilter');
-                const dateFromFilter = document.getElementById('dateFromFilter');
-                const dateToFilter = document.getElementById('dateToFilter');
-                const clearFiltersButton = document.getElementById('clearFiltersButton');
-                const clearHistoryButton = document.getElementById('clearHistoryButton');
                 
-                // Search function
-                function search() {
-                    const query = searchInput.value.trim();
-                    const filters = {
-                        agentType: agentFilter.value,
-                        language: languageFilter.value,
-                        dateFrom: dateFromFilter.value,
-                        dateTo: dateToFilter.value
-                    };
-                    
+                // Search functionality
+                document.getElementById('search-button').addEventListener('click', () => {
+                    const query = document.getElementById('search-box').value;
                     vscode.postMessage({
                         command: 'search',
-                        query: query,
-                        filters: filters
+                        query: query
                     });
-                }
+                });
                 
-                // Search button click
-                searchButton.addEventListener('click', search);
-                
-                // Search on Enter key
-                searchInput.addEventListener('keyup', (e) => {
+                // Enter key in search box
+                document.getElementById('search-box').addEventListener('keyup', (e) => {
                     if (e.key === 'Enter') {
-                        search();
-                    }
-                });
-                
-                // Filter changes
-                agentFilter.addEventListener('change', search);
-                languageFilter.addEventListener('change', search);
-                dateFromFilter.addEventListener('change', search);
-                dateToFilter.addEventListener('change', search);
-                
-                // Clear filters
-                clearFiltersButton.addEventListener('click', () => {
-                    searchInput.value = '';
-                    agentFilter.value = '';
-                    languageFilter.value = '';
-                    dateFromFilter.value = '';
-                    dateToFilter.value = '';
-                    search();
-                });
-                
-                // Clear history
-                clearHistoryButton.addEventListener('click', () => {
-                    if (confirm('Are you sure you want to clear all conversation history? This cannot be undone.')) {
+                        const query = document.getElementById('search-box').value;
                         vscode.postMessage({
-                            command: 'clearHistory'
+                            command: 'search',
+                            query: query
                         });
                     }
                 });
                 
-                // Reuse conversation
+                // Filter dropdown
+                document.getElementById('filter-dropdown').addEventListener('change', (e) => {
+                    vscode.postMessage({
+                        command: 'filter',
+                        agentType: e.target.value
+                    });
+                });
+                
+                // Clear all history
+                document.getElementById('clear-all-button').addEventListener('click', () => {
+                    if (confirm('Are you sure you want to clear all conversation history? This cannot be undone.')) {
+                        vscode.postMessage({
+                            command: 'clearAllHistory'
+                        });
+                    }
+                });
+                
+                // Reuse question
                 document.querySelectorAll('.reuse-button').forEach(button => {
                     button.addEventListener('click', () => {
                         const agentType = button.getAttribute('data-agent');
-                        const userMessage = button.getAttribute('data-message');
+                        const question = button.getAttribute('data-message');
                         
                         vscode.postMessage({
-                            command: 'reuse',
+                            command: 'reuseQuestion',
                             agentType: agentType,
-                            userMessage: userMessage
+                            question: question
                         });
                     });
                 });
-                
+
                 // Clear agent history
                 document.querySelectorAll('.clear-button').forEach(button => {
                     button.addEventListener('click', () => {
